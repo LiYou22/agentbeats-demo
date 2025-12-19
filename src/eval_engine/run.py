@@ -47,7 +47,7 @@ SETTINGS_MODEL = "gpt-4o-mini"
 QUESTION_MODEL = "gpt-4o-mini"
 EXAMPLE_MODEL = "gpt-4o-mini"
 EVAL_1 = "gpt-4o-mini"
-EVAL_2 = "claude-3-haiku-20240307"
+EVAL_2 = "gpt-4o"
 
 # -------------------------
 # Utilities
