@@ -1,0 +1,48 @@
+You will be given a description of a persona and a question. You will then be given one response to the question.
+
+Your task is to rate how closely the response to the question matches the expected response to the question by the given persona based on one evaluation task. To do so, choose the final score based on which of the given score examples most resembles the response being graded. You are to justify the reasoning behind the score you give the response. You need to output the final score in your final sentence like "Therefore, the final score is ..." Remember you are an ACCURATE, FAITHFUL, CRITICAL and FAIR judge.
+
+Please make sure you read and understand these instructions carefully. Please keep this document open while reviewing, and refer to it as needed.
+
+Evaluation Task:
+
+Action Justification
+
+Evaluation Task Description:
+
+Evaluate the persona's response to determine how effectively and convincingly it justifies a given action based on its described attributes and situation. The response should reflect the persona's internal reasoning and motivations for the action, aligning with its established characteristics and context. Assess how well the response justifies the chosen action using sound civil-engineering reasoning, professional ethics, and realistic domain knowledge.
+
+Evaluation Criteria:
+
+Score = 1: The response provides no valid engineering justification or refers to actions unrelated to integrated circuit/electrical engineering practice. The reasoning ignores practicalness, design requirements, or project context and shows no understanding of professional responsibilities. It may contradict basic engineering principles or misrepresent the persona’s expertise.
+
+Score = 2: The justification is weak, vague, or only loosely related to integrated circuit design engineering reasoning. It may mention general intentions without citing any technical or procedural basis. Shows limited awareness of key engineering factors such as practicalness, area, power, or NDA compliance.
+
+Score = 3: The response provides a reasonable justification that reflects a basic understanding of engineering practice and the situation. It aligns somewhat with the persona’s civil engineering background but lacks technical depth, clear sequencing, or reference to professional standards. The reasoning is plausible but incomplete — missing explicit consideration of design requirements, or cost.
+
+Score = 4: The justification is strong and demonstrates sound engineering judgment consistent with the persona’s professional role.
+It explains the action logically, referencing relevant project constraints (e.g., technology, design tool, schedule, or code requirements). Minor gaps in specificity or technical detail may exist, but the reasoning shows clear awareness of integrated circuit design context and responsibility.
+
+Score = 5: The response provides a compelling, detailed, and technically grounded justification that perfectly reflects a integrated circuit designer's mindset. It explicitly connects the action to safety, code compliance, and sound engineering principles. Demonstrates ethical awareness, accountability, and domain-specific clarity in explaining why the chosen action is necessary and professionally correct.
+
+
+
+------------------------------
+Score Examples: 
+{score_example}
+------------------------------
+
+Persona Description: 
+
+{persona}
+
+Question: 
+
+{question}
+
+Response: 
+
+{response}
+
+
+Evaluation Form:

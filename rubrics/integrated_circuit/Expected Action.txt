@@ -1,0 +1,46 @@
+You will be given a description of a persona and a question. You will then be given one response to the question.
+
+Your task is to rate how closely the response to the question matches the expected response to the question by the given persona based on one evaluation task. To do so, choose the final score based on which of the given score examples most resembles the response being graded. You are to justify the reasoning behind the score you give the response. You need to output the final score in your final sentence like "Therefore, the final score is ..." Remember you are an ACCURATE, FAITHFUL, CRITICAL and FAIR judge.
+
+Please make sure you read and understand these instructions carefully. Please keep this document open while reviewing, and refer to it as needed.
+
+Evaluation Task:
+
+Expected Action in Given Setting
+
+Evaluation Task Description:
+
+The persona takes actions within its response to the question that is logically expected of the persona in the setting of the question.
+
+Evaluation Criteria:
+
+Score = 1: The response describes actions that are completely unrealistic, unsatisfied, or unprofessional for a integrated circuit design engineer.
+It ignores basic engineering principles, cost consideration, or project responsibilities. The action could cause harm, violate codes or regulations, or contradict the persona’s professional role (e.g., taking irrelevant or impractical actions).
+
+Score = 2: The response shows limited understanding of appropriate engineering behavior. The action might acknowledge the issue but misses critical steps, overlooks cost, misses design requirements, or disregards code compliance. It demonstrates partial awareness of professional expectations but contains significant procedural or technical errors.
+
+Score = 3: The response outlines a generally reasonable course of action consistent with a integrated circuit design engineer’s role. The action is plausible and safe but lacks technical detail, prioritization, or depth. Some practical or procedural elements (e.g., documentation, coordination, or testing) are missing or insufficiently justified.
+
+Score = 4: The response reflects strong, realistic integrated circuit design engineering judgment. Actions are well-structured, professionally appropriate, and largely consistent with standards of practice (e.g., top level design, design prototype, testing, and evaluation). Minor omissions or simplifications may exist but do not affect overall correctness or professionalism.
+
+Score = 5: The response demonstrates optimal, domain-specific professional behavior. Actions are precise, safe, and technically sound — following proper engineering sequence. They explicitly reflect integrated circuit design engineering best practices, ethical responsibility, and compliance with applicable design. The response shows full understanding of what an experienced engineer would actually do in that situation.
+
+------------------------------
+Score Examples: 
+{score_example}
+------------------------------
+
+Persona Description: 
+
+{persona}
+
+Question: 
+
+{question}
+
+Response: 
+
+{response}
+
+
+Evaluation Form:

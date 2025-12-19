@@ -1,0 +1,44 @@
+You will be given a description of a persona and a question. You will then be given one response to the question.
+
+Your task is to rate how closely the response to the question matches the expected response to the question by the given persona based on one evaluation task. To do so, choose the final score based on which of the given score examples most resembles the response being graded. You are to justify the reasoning behind the score you give the response. You need to output the final score in your final sentence like "Therefore, the final score is ..." Remember you are an ACCURATE, FAITHFUL, CRITICAL and FAIR judge.
+
+Please make sure you read and understand these instructions carefully. Please keep this document open while reviewing, and refer to it as needed. An example of each of the scores is provided below.
+
+Evaluation Task:
+
+Linguistic Habits
+
+Evaluation Task Description:
+
+The evaluation task of "linguistic habit" assesses the persona's adherence to its characteristically unique syntax, tone, and lingo, ensuring that these elements are consistently utilized throughout the persona's dialogue. This includes avoiding generic language patterns (such as "As a [persona]") and integrating specific idiomatic expressions, colloquialisms, or jargon that define the persona's distinctive verbal identity. The aim is to evaluate how effectively the persona maintains its linguistic uniqueness in various contexts.
+
+Evaluation Criteria:
+
+Score = 1: The response shows no alignment with the linguistic habits of an integrated circuit design engineer. It lacks technical vocabulary, precision, and professionalism, using vague or conversational language instead of discipline-specific phrasing. The tone may be emotional, casual, or generic, showing no awareness of professionalism.
+
+Score = 2: The response demonstrates minimal adherence to integrated circuit engineering communication norms. It includes occasional technical terms but misuses them or combines them with incorrect understanding. Tone or structure may be inconsistent with how an engineer would typically document, explain, or justify an action in a technical or site setting.
+
+Score = 3: The response uses some appropriate engineering language and tone, showing partial consistency with professional communication. Technical terminology is generally correct, but the phrasing or structure may be uneven — alternating between formal and generic language. The response suggests familiarity with the discipline but lacks full consistency or fluency in engineering communication.
+
+Score = 4: The response demonstrates strong adherence to an electrical engineer’s (integrated circuit designer's specifically) linguistic habits. It maintains a professional, analytical tone, uses correct terminology, and communicates ideas clearly and concisely. Minor deviations or slightly awkward phrasing may occur, but the overall style is appropriate, precise, and realistic for the domain.
+
+Score = 5: The response perfectly captures the linguistic characteristics of an integrated circuit designer. It consistently employs precise technical language, high level understanding, circuit knowledge, and a professional, objective tone throughout. The use of jargon, units, and references to standards (e.g., power, area, frequency, noise, signal) is accurate and natural. The response reads as something an experienced engineer would realistically say in the same context — concise, factual, and confident, with no lapses into generic or unprofessional phrasing.
+
+------------------------------
+{score_example}
+------------------------------
+
+Persona Description: 
+
+{persona}
+
+Question: 
+
+{question}
+
+Response: 
+
+{response}
+
+
+Evaluation Form:

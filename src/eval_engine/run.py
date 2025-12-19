@@ -1,0 +1,255 @@
+from .utils import *
+from .eval_tasks import *
+import ast
+import argparse
+import os
+import json
+from .personas import *
+import logging
+import re
+from pathlib import Path
+
+# -------------------------
+# Agent-safe helper
+# -------------------------
+def agent_safe_fail(msg):
+    """
+    Never call exit() inside an agent.
+    Raise instead so the agent server won't die.
+    """
+    raise FileNotFoundError(msg)
+
+# -------------------------
+# Path setup
+# -------------------------
+CODE_DIR = Path(__file__).parent
+PROJECT_ROOT = CODE_DIR.parent
+
+RUBRICS_DIR = PROJECT_ROOT / "rubrics"
+full_rubrics_path = str(RUBRICS_DIR / "general")
+
+# -------------------------
+# Logging
+# -------------------------
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# -------------------------
+# Model configs
+# -------------------------
+SETTINGS_MODEL = "gpt-4o-mini"
+QUESTION_MODEL = "gpt-4o-mini"
+EXAMPLE_MODEL = "gpt-4o-mini"
+EVAL_1 = "gpt-4o-mini"
+EVAL_2 = "claude-3-haiku-20240307"
+
+# -------------------------
+# Utilities
+# -------------------------
+def extract_list(original_string):
+    list_string = original_string.replace("```python", "").replace("```", "")
+    list_string = list_string.strip()
+    return ast.literal_eval(list_string)
+
+# -------------------------
+# Core logic
+# -------------------------
+def select_settings(persona, settings_options):
+    settings_prompt = f"""
+Given the following persona description, select the most relevant settings
+from the given settings options. Output ONLY a python list.
+
+Persona: {persona}
+Settings: {settings_options}
+Selected Settings:
+"""
+    selected_settings = run_model(
+        input_prompt=settings_prompt,
+        model_card=SETTINGS_MODEL
+    )
+    return extract_list(selected_settings)
+
+def gen_questions(persona, settings, num_questions=1):
+    questions = {task: [] for task in tasks}
+
+    for task in tasks:
+        description = question_requirements[task]
+        question_prompt = f"""
+Generate exactly {num_questions} challenging multi-step questions.
+
+Persona: {persona}
+Settings: {settings}
+Evaluation Task: {task}
+Description: {description}
+
+Output ONLY a python list.
+"""
+        for _ in range(5):
+            try:
+                task_questions = run_model(
+                    input_prompt=question_prompt,
+                    model_card=QUESTION_MODEL
+                )
+                task_questions = extract_list(task_questions)
+                if len(task_questions) == num_questions:
+                    break
+            except Exception:
+                continue
+
+        questions[task].extend(task_questions)
+
+    return questions
+
+def process_examples(text):
+    matches = re.findall(
+        r'Score (\d+): *Response - *"?(.*?)"?(?=\n*Score \d+: *Response -|$)',
+        text,
+        re.S
+    )
+    processed = '\n\n'.join(
+        f'Score {s}: "{r.strip()}"' for s, r in matches
+    )
+    return "\n\n".join(
+        line for line in processed.split("\n") if line.startswith("Score")
+    )
+
+def parse_rubric(text):
+    match = re.search(r"final score is\s*(\d+)", text)
+    return int(match.group(1)) if match else 0
+
+def parse_evaluation_text(text):
+    match = re.search(r"^(.*?)Therefore, the final score is", text, re.S)
+    return match.group(1).strip() if match else text.strip()
+
+def calculate_modified_average(scores):
+    zeros = scores.count(0)
+    denom = len(scores) - zeros
+    return sum(scores) / denom if denom > 0 else sum(scores)
+
+def gen_answers(persona, questions, model):
+    task_to_qa = {}
+    for task, qs in questions.items():
+        task_to_qa[task] = []
+        for q in qs:
+            a = run_model(input_prompt=q, persona=persona, model_card=model)
+            task_to_qa[task].append((q, a))
+    return task_to_qa
+
+def score_answers(
+    persona,
+    task_to_qa,
+    rubrics_path=full_rubrics_path,
+    return_explanations=True
+):
+    result = {task: {"scores": [], "reasons": []} for task in task_to_qa}
+
+    for task, qa_list in task_to_qa.items():
+        if not qa_list:
+            continue
+
+        rubric_file = f"{rubrics_path}/{task}.txt"
+        if not os.path.exists(rubric_file):
+            logger.warning(f"Missing rubric: {rubric_file}")
+            continue
+
+        with open(rubric_file) as f:
+            rubric = f.read()
+
+        for i in range(0, len(qa_list), 5):
+            batch = qa_list[i:i + 5]
+            sys_prompt, scoring_prompt = format_rubrics(persona, rubric, batch)
+
+            scores = []
+            explanations = []
+
+            for model in [EVAL_1, EVAL_2]:
+                eval_text = run_model(
+                    input_prompt=scoring_prompt,
+                    system=sys_prompt,
+                    temperature=0,
+                    top_p=0,
+                    model_card=model
+                )
+                evals = re.findall(r'\(\d+\) Evaluation:(.*?)(?=\(\d+\)|$)', eval_text, re.S)
+                scores.extend(parse_rubric(e) for e in evals)
+                explanations.extend(parse_evaluation_text(e) for e in evals)
+
+            result[task]["scores"].append(calculate_modified_average(scores))
+            if return_explanations:
+                result[task]["reasons"].extend(explanations)
+
+    return result
+
+# -------------------------
+# Agent-safe entry
+# -------------------------
+def main(
+    persona,
+    model,
+    model_name=None,
+    saved_questions=None,
+    saved_responses=None,
+    return_explanations=True
+):
+    try:
+        if saved_responses:
+            if not os.path.exists(saved_responses):
+                agent_safe_fail(f"No responses directory {saved_responses}")
+            task_to_qa = load_responses(persona, saved_responses)
+
+        else:
+            if saved_questions:
+                task_to_qa = load_questions(persona, saved_questions)
+            else:
+                settings = select_settings(persona, settings_list)
+                questions = gen_questions(persona, settings)
+                task_to_qa = gen_answers(persona, questions, model)
+
+        result = score_answers(persona, task_to_qa, return_explanations=return_explanations)
+
+        overall_scores = [
+            sum(v["scores"]) / len(v["scores"])
+            for v in result.values()
+            if v["scores"]
+        ]
+
+        if overall_scores:
+            result["PersonaScore"] = {
+                "scores": [sum(overall_scores) / len(overall_scores)],
+                "reasons": []
+            }
+
+        return result
+
+    except Exception as e:
+        logger.exception("Agent-safe failure")
+        return {
+            "PersonaScore": {
+                "scores": [],
+                "reasons": [str(e)]
+            }
+        }
+
+# -------------------------
+# CLI (unchanged)
+# -------------------------
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--persona_list", type=str, default="[]")
+    parser.add_argument("--model", type=str, default="meta-llama/Llama-2-70b-chat-hf")
+    parser.add_argument("--benchmark", type=str, default=None)
+
+    args = parser.parse_args()
+    personas = eval(args.persona_list)
+
+    results = {}
+    for p in personas:
+        results[p] = main(p, args.model)
+
+    logger.info(results)

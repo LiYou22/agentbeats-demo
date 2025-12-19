@@ -20,38 +20,39 @@ def main():
     parser.add_argument("--card-url", type=str, help="URL to advertise in the agent card")
     args = parser.parse_args()
 
-    # Fill in your agent card
-    # See: https://a2a-protocol.org/latest/tutorials/python/3-agent-skills-and-card/
-    
+    # -------- Agent metadata (filled) --------
     skill = AgentSkill(
-        id="",
-        name="",
-        description="",
-        tags=[],
+        id="persona-evaluation",
+        name="Persona Evaluation",
+        description="Evaluates personas using LLM-generated questions and rubric-based scoring.",
+        tags=["evaluation", "benchmark", "llm"],
         examples=[]
     )
 
     agent_card = AgentCard(
-        name="",
-        description="",
+        name="PersonaEvalAgent",
+        description="An agent that evaluates personas with LLM-based questions and rubric scoring.",
         url=args.card_url or f"http://{args.host}:{args.port}/",
-        version='1.0.0',
-        default_input_modes=['text'],
-        default_output_modes=['text'],
+        version="1.0.0",
+        default_input_modes=["text"],
+        default_output_modes=["text"],
         capabilities=AgentCapabilities(streaming=True),
         skills=[skill]
     )
+    # ----------------------------------------
 
     request_handler = DefaultRequestHandler(
         agent_executor=Executor(),
         task_store=InMemoryTaskStore(),
     )
+
     server = A2AStarletteApplication(
         agent_card=agent_card,
         http_handler=request_handler,
     )
+
     uvicorn.run(server.build(), host=args.host, port=args.port)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
