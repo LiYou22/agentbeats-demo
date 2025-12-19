@@ -23,9 +23,12 @@ def agent_safe_fail(msg):
 # Path setup
 # -------------------------
 CODE_DIR = Path(__file__).parent
-PROJECT_ROOT = CODE_DIR.parent
+PROJECT_ROOT = CODE_DIR.parent.parent
 
 RUBRICS_DIR = PROJECT_ROOT / "rubrics"
+PROMPTS_DIR = PROJECT_ROOT / "prompts"
+RESULTS_DIR = PROJECT_ROOT / "results"
+SCORES_DIR = PROJECT_ROOT / "scores"
 full_rubrics_path = str(RUBRICS_DIR / "general")
 
 # -------------------------
@@ -62,13 +65,13 @@ def extract_list(original_string):
 # -------------------------
 def select_settings(persona, settings_options):
     settings_prompt = f"""
-Given the following persona description, select the most relevant settings
-from the given settings options. Output ONLY a python list.
+    Given the following persona description, select the most relevant settings
+    from the given settings options. Output ONLY a python list.
 
-Persona: {persona}
-Settings: {settings_options}
-Selected Settings:
-"""
+    Persona: {persona}
+    Settings: {settings_options}
+    Selected Settings:
+    """
     selected_settings = run_model(
         input_prompt=settings_prompt,
         model_card=SETTINGS_MODEL
@@ -81,15 +84,15 @@ def gen_questions(persona, settings, num_questions=1):
     for task in tasks:
         description = question_requirements[task]
         question_prompt = f"""
-Generate exactly {num_questions} challenging multi-step questions.
+        Generate exactly {num_questions} challenging multi-step questions.
 
-Persona: {persona}
-Settings: {settings}
-Evaluation Task: {task}
-Description: {description}
+        Persona: {persona}
+        Settings: {settings}
+        Evaluation Task: {task}
+        Description: {description}
 
-Output ONLY a python list.
-"""
+        Output ONLY a python list.
+        """
         for _ in range(5):
             try:
                 task_questions = run_model(
@@ -119,6 +122,20 @@ def process_examples(text):
         line for line in processed.split("\n") if line.startswith("Score")
     )
 
+def gen_score_examples(persona, qa, rubric, model):
+    examples_rubric = open(PROMPTS_DIR / 'score_examples' / 'parallel_examples.txt').read()
+    rubrics = []
+    for question, _ in qa:
+        score_prompt = open(PROMPTS_DIR / 'score_examples' / 'prompt.txt').read()
+        score_prompt = score_prompt.format(persona = persona, question = question, rubric = rubric)
+        rubrics.append(score_prompt)
+
+    prompt = examples_rubric.format(rubrics=rubrics)
+
+    examples = run_model(input_prompt=prompt, temperature=0, top_p=0, model_card=model)
+    examples = process_examples(examples)
+    return examples
+
 def parse_rubric(text):
     match = re.search(r"final score is\s*(\d+)", text)
     return int(match.group(1)) if match else 0
@@ -127,10 +144,77 @@ def parse_evaluation_text(text):
     match = re.search(r"^(.*?)Therefore, the final score is", text, re.S)
     return match.group(1).strip() if match else text.strip()
 
+def format_rubrics(persona, rubric, qa):
+    sys_prompt = open(PROMPTS_DIR / 'rubric_grading' / 'sys_prompt.txt').read()
+    prompt_outline = open(PROMPTS_DIR / 'rubric_grading' / 'prompt.txt').read()
+    rubrics = []
+
+    examples = gen_score_examples(persona, qa, rubric, EXAMPLE_MODEL)
+    for i in range(len(qa)):
+        question, answer = qa[i]
+        score_examples = examples[i]
+        formatted_rubric = rubric.format(persona = persona, question = question, response = answer, score_example = score_examples)
+        rubrics.append(formatted_rubric)
+
+    
+    scoring_prompt = prompt_outline.format(rubrics = rubrics)
+
+    return sys_prompt, scoring_prompt
+
+def parse_evaluations(text):
+    pattern = r'\(\d+\) Evaluation:(.*?)(?=\(\d+\) Evaluation:|$)'
+    evaluations = re.findall(pattern, text, re.DOTALL)
+    evaluations = [eval.strip() for eval in evaluations]
+    return evaluations
+
 def calculate_modified_average(scores):
     zeros = scores.count(0)
     denom = len(scores) - zeros
     return sum(scores) / denom if denom > 0 else sum(scores)
+
+def score_rubrics(sys_prompt, scoring_prompt, num_evals=1, return_explanations=True):
+    scores = []
+    explanations = []
+
+    for _ in range(num_evals):
+        evaluator1 = run_model(input_prompt=scoring_prompt, temperature=0, top_p=0, model_card=EVAL_1, system = sys_prompt)
+        evaluator2 = run_model(input_prompt=scoring_prompt, temperature=0, top_p=0, model_card=EVAL_2, system = sys_prompt)
+
+        evaluator1 = parse_evaluations(evaluator1)
+        evaluator2 = parse_evaluations(evaluator2)
+
+        scores1 = [parse_rubric(rubric) for rubric in evaluator1]
+        scores2 = [parse_rubric(rubric) for rubric in evaluator2]
+
+        score1 = calculate_modified_average(scores1)
+        score2 = calculate_modified_average(scores2)
+
+        scores.append(score1)
+        scores.append(score2)
+        
+        if return_explanations:
+            # Parse evaluation explanations
+            explanations1 = [parse_evaluation_text(eval_text) for eval_text in evaluator1]
+            explanations2 = [parse_evaluation_text(eval_text) for eval_text in evaluator2]
+            
+            explanations.append({
+                "evaluator1": {
+                    "scores": scores1,
+                    "explanations": explanations1
+                },
+                "evaluator2": {
+                    "scores": scores2,
+                    "explanations": explanations2
+                }
+            })
+    
+    if return_explanations:
+        return {
+            "average_score": sum(scores) / len(scores),
+            "detailed_explanations": explanations
+        }
+    else:
+        return sum(scores) / len(scores)
 
 def gen_answers(persona, questions, model):
     task_to_qa = {}
@@ -185,6 +269,56 @@ def score_answers(
                 result[task]["reasons"].extend(explanations)
 
     return result
+
+def save_responses(persona, task_to_qa, model_name):
+    dir = RESULTS_DIR / model_name
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
+    with open(dir / f'{persona}_qa.json', 'w') as file:
+        json.dump(task_to_qa, file, indent=4)
+
+def save_scores(save_name, scores):
+    dir = SCORES_DIR / save_name
+    if not os.path.exists(dir):
+        os.makedirs(dir)
+
+    # Issac: I changed to save the json directly.
+    with open(dir / 'scores.json', 'w') as file:
+        json.dump(scores, file, indent=4)
+
+def load_questions(persona, saved_questions):
+    base_questions_dir = PROJECT_ROOT / "questions"
+    dir = base_questions_dir / saved_questions
+    if not os.path.exists(dir):
+        print(f"No questions directory {dir}")
+        exit(0)
+    
+    file_path = f'{dir}/{persona}.json'
+    if not os.path.exists(file_path):
+        print(f"No JSON file {file_path}")
+        exit(0)
+
+    with open(file_path, 'r') as file:
+        questions = json.load(file)
+
+    return questions
+
+def load_responses(persona, saved_responses): 
+    dir = saved_responses
+    if not os.path.exists(dir):
+        print(f"No responses directory {saved_responses}")
+        exit(0)
+    
+    file_path = f'{dir}/{persona}_qa.json'
+    if not os.path.exists(file_path):
+        print(f"No JSON file {file_path}")
+        exit(0)
+
+    with open(file_path, 'r') as file:
+        task_to_qa = json.load(file)
+
+    return task_to_qa
 
 # -------------------------
 # Agent-safe entry
